@@ -87,8 +87,15 @@ def main():
     st.title("Company Domain Finder")
     st.write("Enter a company name to find all its domains using Google.")
     company = st.text_input("Enter the company name:")
-    if 'root_selected' not in st.session_state:
-        st.session_state['root_selected'] = None
+    if 'root_options' not in st.session_state:
+        st.session_state['root_options'] = []
+    if 'expanded_domains' not in st.session_state:
+        st.session_state['expanded_domains'] = {}  # {root: [domains]}
+    if 'deleted_roots' not in st.session_state:
+        st.session_state['deleted_roots'] = set()
+    if 'deleted_domains' not in st.session_state:
+        st.session_state['deleted_domains'] = {}  # {root: set(domains)}
+
     if st.button("Search for Root Domains"):
         if not company:
             st.warning("Please enter a company name.")
@@ -101,26 +108,64 @@ def main():
                 else:
                     root_counts = Counter(roots)
                     most_common = [r for r, _ in root_counts.most_common()]
-                    # LLM filtering: social media and news
                     with st.spinner("Filtering out social media and news domains"):
                         filtered_roots = filter_social_and_news_domains_llm(most_common)
-                    if not filtered_roots:
-                        st.warning("All found root domains are social media/news or none found.")
+                    st.session_state['root_options'] = filtered_roots
+                    st.session_state['expanded_domains'] = {}
+                    st.session_state['deleted_roots'] = set()
+                    st.session_state['deleted_domains'] = {}
+
+    # Table for root domains
+    roots = [r for r in st.session_state.get('root_options', []) if r not in st.session_state.get('deleted_roots', set())]
+    if roots:
+        st.write("### Root Domains")
+        # Table header
+        header_col1, header_col2 = st.columns([3, 4])
+        with header_col1:
+            st.markdown("**Root Domain**")
+        with header_col2:
+            st.markdown("**Action**")
+
+        for idx, root in enumerate(roots):
+            root_url = f"https://www.{root}.com"
+            col1, col2 = st.columns([3, 4])
+            with col1:
+                st.markdown(f"[{root_url}]({root_url})")
+            with col2:
+                vcol, dcol, bcol = st.columns([1, 1, 3])
+                with vcol:
+                    st.markdown(f'<a href="{root_url}" target="_blank">🔗</a>', unsafe_allow_html=True)
+                with dcol:
+                    del_key = f"del_root_{idx}"
+                    if st.button("🗑️", key=del_key, help="Delete root domain"):
+                        st.session_state['deleted_roots'].add(root)
+                        st.rerun()
+                with bcol:
+                    find_key = f"find_domains_{idx}"
+                    if root not in st.session_state['expanded_domains']:
+                        if st.button("Find all domains", key=find_key):
+                            with st.spinner(f"Searching for all www.{root}.* domains..."):
+                                domains = get_all_domains(root)
+                            st.session_state['expanded_domains'][root] = domains
+                            st.session_state['deleted_domains'][root] = set()
+                            st.rerun()
                     else:
-                        st.session_state['root_options'] = filtered_roots
-                        st.session_state['root_selected'] = None
-    if 'root_options' in st.session_state and st.session_state['root_options']:
-        st.write("Select the root domain to search for all www.<root>.* domains:")
-        root = st.selectbox("Root domain", st.session_state['root_options'], key='root_select')
-        if st.button("Find All Domains for Root Domain"):
-            with st.spinner(f"Searching for all www.{root}.* domains..."):
-                domains = get_all_domains(root)
-            st.subheader(f"All www.{root}.* domains:")
-            if domains:
-                for d in domains:
-                    st.write(d)
-            else:
-                st.write("No domains found.")
+                        st.write(":arrow_down: Domains:")
+                        for didx, domain in enumerate(st.session_state['expanded_domains'][root]):
+                            if domain in st.session_state['deleted_domains'].get(root, set()):
+                                continue
+                            dcol1, dcol2, dcol3 = st.columns([4,1,1])
+                            with dcol1:
+                                st.markdown(f"[{domain}]({domain})")
+                            with dcol2:
+                                st.markdown(f'<a href="{domain}" target="_blank">🔗</a>', unsafe_allow_html=True)
+                            with dcol3:
+                                del_domain_key = f"del_domain_{root}_{didx}"
+                                if st.button("🗑️", key=del_domain_key, help="Delete this domain"):
+                                    st.session_state['deleted_domains'][root].add(domain)
+                                    st.rerun()
+    else:
+        st.info("No root domains to display. Please search for a company.")
 
 if __name__ == "__main__":
     main() 
