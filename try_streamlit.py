@@ -1,3 +1,5 @@
+# This script uses the serper api and the gemini llm
+
 import streamlit as st
 import requests
 import tldextract

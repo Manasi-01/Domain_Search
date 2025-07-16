@@ -1,3 +1,5 @@
+# uses google custom search api and openai model
+
 import streamlit as st
 import requests
 import tldextract
