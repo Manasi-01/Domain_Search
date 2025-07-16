@@ -83,23 +83,13 @@ def search_google(query, num=400):
             
     return all_links[:num]  # Return only the requested number of results
 
-# Extract root domains from URLs using tldextract
+# Extract root domains from links
 def extract_root_domains(links):
     roots = []
     for link in links:
         ext = tldextract.extract(link)
         if ext.domain and ext.suffix:
-            # Handle special domain names like team.blue
-            domain = ext.domain.lower()
-            # Check if the domain itself might be a company name
-            if ext.suffix and '.' in ext.suffix:
-                # Handle cases like team.blue, team.red, etc.
-                if domain not in roots:
-                    roots.append(domain)
-            # Also add the full domain (domain + suffix) as a potential match
-            full_domain = f"{domain}.{ext.suffix.lower()}"
-            if full_domain not in roots:
-                roots.append(full_domain)
+            roots.append(ext.domain.lower())
     return roots
 
 # Extract all www.<root>.* domains and return full URLs
@@ -120,6 +110,7 @@ def get_all_domains(root):
                 excluded_tlds.add(ext.suffix.lower())
         time.sleep(1)
     return sorted(found_domains)
+
 
 # Batch filter function using Gemini for social media and news domains only
 # Pre-filter domains using pattern matching before OpenAI call
